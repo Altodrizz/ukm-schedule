@@ -4,20 +4,33 @@ if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'admin') {
     header("Location: ../login.php"); exit;
 }
 require '../config/db.php';
+require '../config/jadwal_helper.php';
 
 $anggota = $pdo->query("SELECT * FROM pengguna ORDER BY nama_lengkap")->fetchAll();
 $jenis   = $pdo->query("SELECT * FROM jenis_jadwal")->fetchAll();
 $pesan   = '';
+$error   = '';
+$isi     = ['id_pengguna'=>'', 'id_jenis_jadwal'=>'', 'tanggal_tugas'=>'', 'waktu_mulai'=>'', 'waktu_selesai'=>''];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $stmt = $pdo->prepare("INSERT INTO detail_jadwal
-        (id_pengguna, id_jenis_jadwal, id_admin, tanggal_tugas, waktu_mulai, waktu_selesai)
-        VALUES (?, ?, ?, ?, ?, ?)");
-    $stmt->execute([
-        $_POST['id_pengguna'], $_POST['id_jenis_jadwal'], $_SESSION['id'],
-        $_POST['tanggal_tugas'], $_POST['waktu_mulai'], $_POST['waktu_selesai']
-    ]);
-    $pesan = "Jadwal berhasil ditambahkan!";
+    foreach ($isi as $k => $v) { $isi[$k] = $_POST[$k] ?? ''; }
+
+    $error = validasiJadwal(
+        $pdo, $isi['id_pengguna'], $isi['tanggal_tugas'],
+        $isi['waktu_mulai'], $isi['waktu_selesai']
+    );
+
+    if (!$error) {
+        $stmt = $pdo->prepare("INSERT INTO detail_jadwal
+            (id_pengguna, id_jenis_jadwal, id_admin, tanggal_tugas, waktu_mulai, waktu_selesai)
+            VALUES (?, ?, ?, ?, ?, ?)");
+        $stmt->execute([
+            $isi['id_pengguna'], $isi['id_jenis_jadwal'], $_SESSION['id'],
+            $isi['tanggal_tugas'], $isi['waktu_mulai'], $isi['waktu_selesai']
+        ]);
+        $pesan = "Jadwal berhasil ditambahkan!";
+        $isi = array_fill_keys(array_keys($isi), '');
+    }
 }
 ?>
 <!DOCTYPE html>
@@ -89,38 +102,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <?php if ($pesan): ?>
           <div class="alert alert-success">✅ <?= htmlspecialchars($pesan) ?></div>
         <?php endif; ?>
+        <?php if ($error): ?>
+          <div class="alert alert-error">⚠️ <?= htmlspecialchars($error) ?></div>
+        <?php endif; ?>
 
         <form method="POST">
           <div class="form-group">
             <label>Pilih Anggota</label>
             <select name="id_pengguna" required>
-              <option value="" disabled selected>-- Pilih Anggota --</option>
+              <option value="" disabled <?= $isi['id_pengguna']===''?'selected':'' ?>>-- Pilih Anggota --</option>
               <?php foreach ($anggota as $a): ?>
-                <option value="<?= $a['id_pengguna'] ?>"><?= htmlspecialchars($a['nama_lengkap']) ?> (<?= $a['nim'] ?>)</option>
+                <option value="<?= $a['id_pengguna'] ?>" <?= (string)$isi['id_pengguna']===(string)$a['id_pengguna']?'selected':'' ?>><?= htmlspecialchars($a['nama_lengkap']) ?> (<?= $a['nim'] ?>)</option>
               <?php endforeach; ?>
             </select>
           </div>
           <div class="form-group">
             <label>Jenis Jadwal</label>
             <select name="id_jenis_jadwal" required>
-              <option value="" disabled selected>-- Pilih Jenis --</option>
+              <option value="" disabled <?= $isi['id_jenis_jadwal']===''?'selected':'' ?>>-- Pilih Jenis --</option>
               <?php foreach ($jenis as $j): ?>
-                <option value="<?= $j['id_jenis_jadwal'] ?>"><?= htmlspecialchars($j['nama_jenis']) ?></option>
+                <option value="<?= $j['id_jenis_jadwal'] ?>" <?= (string)$isi['id_jenis_jadwal']===(string)$j['id_jenis_jadwal']?'selected':'' ?>><?= htmlspecialchars($j['nama_jenis']) ?></option>
               <?php endforeach; ?>
             </select>
           </div>
           <div class="form-group">
             <label>Tanggal Tugas</label>
-            <input type="date" name="tanggal_tugas" required>
+            <input type="date" name="tanggal_tugas" value="<?= htmlspecialchars($isi['tanggal_tugas']) ?>" required>
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
             <div class="form-group">
               <label>Waktu Mulai</label>
-              <input type="time" name="waktu_mulai" required>
+              <input type="time" name="waktu_mulai" value="<?= htmlspecialchars($isi['waktu_mulai']) ?>" required>
             </div>
             <div class="form-group">
               <label>Waktu Selesai</label>
-              <input type="time" name="waktu_selesai" required>
+              <input type="time" name="waktu_selesai" value="<?= htmlspecialchars($isi['waktu_selesai']) ?>" required>
             </div>
           </div>
           <button type="submit" class="btn btn-blue" style="width:100%;justify-content:center;margin-top:8px;">

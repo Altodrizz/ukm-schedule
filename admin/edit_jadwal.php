@@ -4,6 +4,7 @@ if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'admin') {
     header("Location: ../login.php"); exit;
 }
 require '../config/db.php';
+require '../config/jadwal_helper.php';
 
 $id     = intval($_GET['id']);
 $q      = $pdo->prepare("SELECT * FROM detail_jadwal WHERE id_detail_jadwal=?");
@@ -14,17 +15,35 @@ if (!$data) { header("Location: dashboard.php"); exit; }
 $anggota = $pdo->query("SELECT * FROM pengguna ORDER BY nama_lengkap")->fetchAll();
 $jenis   = $pdo->query("SELECT * FROM jenis_jadwal")->fetchAll();
 
+$error = '';
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $stmt = $pdo->prepare("UPDATE detail_jadwal SET
-        id_pengguna=?, id_jenis_jadwal=?, tanggal_tugas=?,
-        waktu_mulai=?, waktu_selesai=?, status_tugas=?
-        WHERE id_detail_jadwal=?");
-    $stmt->execute([
-        $_POST['id_pengguna'], $_POST['id_jenis_jadwal'],
-        $_POST['tanggal_tugas'], $_POST['waktu_mulai'],
-        $_POST['waktu_selesai'], $_POST['status_tugas'], $id
-    ]);
-    header("Location: dashboard.php"); exit;
+    // tampilkan kembali input admin bila validasi gagal
+    $data['id_pengguna']     = $_POST['id_pengguna'];
+    $data['id_jenis_jadwal'] = $_POST['id_jenis_jadwal'];
+    $data['tanggal_tugas']   = $_POST['tanggal_tugas'];
+    $data['waktu_mulai']     = $_POST['waktu_mulai'];
+    $data['waktu_selesai']   = $_POST['waktu_selesai'];
+    $data['status_tugas']    = $_POST['status_tugas'];
+
+    // jadwal yang sedang diedit dikecualikan agar tidak bentrok dengan dirinya sendiri
+    $error = validasiJadwal(
+        $pdo, $data['id_pengguna'], $data['tanggal_tugas'],
+        $data['waktu_mulai'], $data['waktu_selesai'], $id
+    );
+
+    if (!$error) {
+        $stmt = $pdo->prepare("UPDATE detail_jadwal SET
+            id_pengguna=?, id_jenis_jadwal=?, tanggal_tugas=?,
+            waktu_mulai=?, waktu_selesai=?, status_tugas=?
+            WHERE id_detail_jadwal=?");
+        $stmt->execute([
+            $data['id_pengguna'], $data['id_jenis_jadwal'],
+            $data['tanggal_tugas'], $data['waktu_mulai'],
+            $data['waktu_selesai'], $data['status_tugas'], $id
+        ]);
+        header("Location: dashboard.php"); exit;
+    }
 }
 ?>
 <!DOCTYPE html>
@@ -85,6 +104,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <div class="card-header">
           <h3>✏️ Form Edit Jadwal</h3>
         </div>
+
+        <?php if ($error): ?>
+          <div class="alert alert-error">⚠️ <?= htmlspecialchars($error) ?></div>
+        <?php endif; ?>
+
         <form method="POST">
           <div class="form-group">
             <label>Pilih Anggota</label>

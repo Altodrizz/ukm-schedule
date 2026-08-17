@@ -35,6 +35,9 @@ CREATE TABLE detail_jadwal (
     FOREIGN KEY (id_admin) REFERENCES admin(id_admin)
 );
 
+-- Mempercepat pengecekan bentrok jadwal (1 anggota, 1 tanggal)
+CREATE INDEX idx_jadwal_bentrok ON detail_jadwal (id_pengguna, tanggal_tugas, waktu_mulai, waktu_selesai);
+
 -- BARU (benar - sudah di-hash bcrypt, password: password)
 INSERT INTO admin (username, nama_lengkap, password)
 VALUES ('admin', 'Administrator', 'Admin99');
